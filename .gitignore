@@ -1,0 +1,6 @@
+.idea
+recorders
+error_log.txt
+error.txt
+node_modules
+.env

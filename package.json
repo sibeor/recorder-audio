@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@picovoice/porcupine-node-demo": "^3.0.2",
+    "@picovoice/pvrecorder-node": "^1.2.2",
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "socket.io-client": "^4.7.5",
+    "wavefile": "^11.0.0"
+  }
+}
