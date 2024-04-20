@@ -49,6 +49,7 @@ function resetToDefaultValues () {
   }
   // recorder = new PvRecorder(frameLength, audioDeviceIndex)
   isInterrupted = false
+  isRecording = false
 }
 
 let devices = PvRecorder.getAvailableDevices()
@@ -56,7 +57,7 @@ for (let i = 0; i < devices.length; i++) {
   console.log(`index: ${i}, device name: ${devices[i]}`)
 }
 let isRecording = false
-let outputWavPath = 'recorders/'
+let outputWavPath = ''
 let fileName = ''
 let wav = new WaveFile()
 let frames = []
@@ -103,13 +104,6 @@ app.put('/start-recording/:fileName', async (req, res) => {
 
 async function readBuffer () {
   let cnt = 0
-  while (!isRecording && cnt < 11) {
-    cnt++
-    await waitForSomeSeconds(1)
-    if (cnt >= 10) {
-      return
-    }
-  }
   while (!isInterrupted) {
     let frame = await recorder.read()
     if (fileName) {
@@ -148,12 +142,10 @@ app.put('/stop-recording', async (req, res) => {
         audioData.set(frames[i], i * recorder.frameLength)
       }
       
-      wav.fromScratch(1, recorder.sampleRate, '16', audioData)
-      console.log('outputWavPath')
+      wav.fromScratch(1, recorder.sampleRate, '8', audioData)
+      await waitForSomeSeconds(7)
       console.log(outputWavPath)
-      await waitForSomeSeconds(2)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
-      await waitForSomeSeconds(2)
       await sendResultToServer(true, outputWavPath)
     } else {
       await sendResultToServer(false, outputWavPath)
@@ -163,6 +155,7 @@ app.put('/stop-recording', async (req, res) => {
     // res.send('Eroare la Oprirea înregistrării...')
     recorder.stop()
     // recorder.release()
+     resetToDefaultValues()
     console.log(e)
     
     await sendResultToServer(false, outputWavPath)
@@ -171,6 +164,9 @@ app.put('/stop-recording', async (req, res) => {
   }
   
   // recorder.stop()
+  console.log('FINAL STATUS ______________________________________________________')
+  console.log('IS_RECORDING?')
+  console.log(recorder.isRecording)
   // recorder.release()
   resetToDefaultValues()
   
