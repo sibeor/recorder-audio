@@ -57,6 +57,7 @@ for (let i = 0; i < devices.length; i++) {
 }
 let isRecording = false
 let outputWavPath = 'recorders/'
+let outputPaths = []
 let fileName = ''
 let wav = new WaveFile()
 let frames = []
@@ -78,6 +79,7 @@ app.put('/start-recording/:fileName', async (req, res) => {
     console.log('recorder.isRecording === FALSE')
     console.log(recorder.isRecording)
     console.log(outputWavPath)
+    outputPaths.push(outputWavPath)
     let cnt = 0
     while (recorder.isRecording && cnt < 11) {
       cnt++
@@ -149,7 +151,7 @@ app.put('/stop-recording', async (req, res) => {
       }
       
       wav.fromScratch(1, recorder.sampleRate, '16', audioData)
-      console.log('outputWavPath')
+      outputWavPath = outputPaths.shift()
       console.log(outputWavPath)
       await waitForSomeSeconds(2)
       fs.writeFileSync(outputWavPath, wav.toBuffer())

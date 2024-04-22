@@ -45,6 +45,7 @@ function resetToDefaultValues () {
   audioDeviceIndex = process?.env?.DEVICE_ID || 1
   frameLength = 512
   if (!recorder) {
+    console.log('Create new PvRecorder')
     recorder = new PvRecorder(frameLength, audioDeviceIndex)
   }
   // recorder = new PvRecorder(frameLength, audioDeviceIndex)
@@ -58,6 +59,7 @@ for (let i = 0; i < devices.length; i++) {
 }
 let isRecording = false
 let outputWavPath = ''
+let outputPaths = []
 let fileName = ''
 let wav = new WaveFile()
 let frames = []
@@ -79,10 +81,11 @@ app.put('/start-recording/:fileName', async (req, res) => {
     console.log('recorder.isRecording === FALSE')
     console.log(recorder.isRecording)
     console.log(outputWavPath)
+    outputPaths.push(outputWavPath)
     let cnt = 0
     while (recorder.isRecording && cnt < 11) {
       cnt++
-      await waitForSomeSeconds(2)
+      await waitForSomeSeconds(5)
       if (cnt >= 10) {
         console.log('Eroare la /start-recording')
       }
@@ -116,7 +119,7 @@ async function readBuffer () {
 function waitForSomeSeconds (seconds = 1) {
   let milliseconds = seconds * 1000
   return new Promise(resolve => {
-    console.log(`Așteaptă ${seconds} secunde...`)
+    console.log(`Așteaptă ${seconds} secunde...isRecording = `, recorder.isRecording)
     setTimeout(() => {
       resolve()
     }, milliseconds)
@@ -142,8 +145,9 @@ app.put('/stop-recording', async (req, res) => {
         audioData.set(frames[i], i * recorder.frameLength)
       }
       
-      wav.fromScratch(1, recorder.sampleRate, '8', audioData)
-      await waitForSomeSeconds(7)
+      wav.fromScratch(1, recorder.sampleRate, '16', audioData)
+      await waitForSomeSeconds(4)
+      outputWavPath = outputPaths.shift()
       console.log(outputWavPath)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
       await sendResultToServer(true, outputWavPath)
@@ -155,17 +159,24 @@ app.put('/stop-recording', async (req, res) => {
     // res.send('Eroare la Oprirea înregistrării...')
     recorder.stop()
     // recorder.release()
-     resetToDefaultValues()
+    //  resetToDefaultValues()
     console.log(e)
-    
+    let cnt2 = 0
+    while (recorder.isRecording && cnt2 < 11) {
+       await waitForSomeSeconds(5)
+    }
     await sendResultToServer(false, outputWavPath)
     
     resetToDefaultValues()
   }
-  
+  let cnt3 = 0
+  while (recorder.isRecording && cnt3 < 11) {
+    await waitForSomeSeconds(5)
+  }
   // recorder.stop()
   console.log('FINAL STATUS ______________________________________________________')
   console.log('IS_RECORDING?')
+  
   console.log(recorder.isRecording)
   // recorder.release()
   resetToDefaultValues()
