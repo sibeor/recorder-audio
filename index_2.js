@@ -176,7 +176,6 @@ app.put('/stop-recording', async (req, res) => {
   // recorder.stop()
   console.log('FINAL STATUS ______________________________________________________')
   console.log('IS_RECORDING?')
-  
   console.log(recorder.isRecording)
   // recorder.release()
   resetToDefaultValues()
