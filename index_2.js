@@ -38,9 +38,12 @@ async function sendResultToServer (success, fileName) {
 function resetToDefaultValues () {
   outputWavPath = ''
   let fileName = ''
-  wav = new WaveFile()
+  if (!wav) {
+    wav = new WaveFile()
+  }
   frames = []
-  audioDeviceIndex = process?.env?.DEVICE_ID || 1
+  outputPaths = []
+  audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
   frameLength = 512
   if (!recorder) {
     console.log('Create new PvRecorder')
@@ -61,7 +64,9 @@ let outputPaths = []
 let fileName = ''
 let wav = new WaveFile()
 let frames = []
-let audioDeviceIndex = 1
+console.log('DEVICE')
+console.log(process?.env?.DEVICE_ID)
+let audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
 let frameLength = 512
 let recorder = new PvRecorder(frameLength, audioDeviceIndex)
 // console.log(`Using PvRecorder version: ${recorder.version}`)
@@ -83,6 +88,7 @@ app.put('/start-recording/:fileName', async (req, res) => {
       await waitForSomeSeconds(15)
       if (cnt >= 10) {
         console.log('Eroare la /start-recording')
+        resetToDefaultValues()
       }
     }
     outputWavPath = 'recorders/' + fileName + '.wav'
@@ -159,8 +165,6 @@ app.put('/stop-recording', async (req, res) => {
   } catch (e) {
     // res.send('Eroare la Oprirea înregistrării...')
     recorder.stop()
-    // recorder.release()
-    //  resetToDefaultValues()
     console.log(e)
     let cnt2 = 0
     while (recorder.isRecording && cnt2 < 11) {
@@ -168,6 +172,7 @@ app.put('/stop-recording', async (req, res) => {
     }
     await sendResultToServer(false, outputWavPath)
     isRecording = false
+    recorder.release()
     resetToDefaultValues()
   }
   let cnt3 = 0
