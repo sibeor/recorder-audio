@@ -22,8 +22,6 @@ async function sendResultToServer (success, fileName) {
     const data = { success: success, fileName: fileName } // Poți modifica acest obiect pentru a transmite orice altă informație
     
     const crmBaseUrl = process?.env?.CRM_BASE_URL
-    console.log('crmBaseUrl')
-    console.log(crmBaseUrl)
     const crmUrl = crmBaseUrl + '/server/api/v3/qms/record_audio/status'
     const response = await axios.post(crmUrl, data)
     
@@ -71,25 +69,28 @@ let recorder = new PvRecorder(frameLength, audioDeviceIndex)
 let isInterrupted = false
 app.put('/start-recording/:fileName', async (req, res) => {
   console.log('start-recording')
+  console.log('recorder.isRecording' + recorder.isRecording)
+  console.log('isRecording' + isRecording)
   try {
     fileName = req.params.fileName
     if (!fileName) {
       res.sendStatus(404)
       return
     }
+    let cnt = 0
+    while ((recorder.isRecording || isRecording) && cnt < 11) {
+      cnt++
+      await waitForSomeSeconds(15)
+      if (cnt >= 10) {
+        console.log('Eroare la /start-recording')
+      }
+    }
     outputWavPath = 'recorders/' + fileName + '.wav'
     console.log('recorder.isRecording === FALSE')
     console.log(recorder.isRecording)
     console.log(outputWavPath)
     outputPaths.push(outputWavPath)
-    let cnt = 0
-    while (recorder.isRecording && cnt < 11) {
-      cnt++
-      await waitForSomeSeconds(5)
-      if (cnt >= 10) {
-        console.log('Eroare la /start-recording')
-      }
-    }
+    
     recorder.start()
     isRecording = true
     console.log(`Using device: ${recorder.getSelectedDevice()}`)
@@ -145,7 +146,7 @@ app.put('/stop-recording', async (req, res) => {
         audioData.set(frames[i], i * recorder.frameLength)
       }
       
-      wav.fromScratch(1, recorder.sampleRate, '16', audioData)
+      await wav.fromScratch(1, recorder.sampleRate, '16', audioData)
       await waitForSomeSeconds(4)
       outputWavPath = outputPaths.shift()
       console.log(outputWavPath)
@@ -163,15 +164,15 @@ app.put('/stop-recording', async (req, res) => {
     console.log(e)
     let cnt2 = 0
     while (recorder.isRecording && cnt2 < 11) {
-       await waitForSomeSeconds(5)
+       await waitForSomeSeconds(2)
     }
     await sendResultToServer(false, outputWavPath)
-    
+    isRecording = false
     resetToDefaultValues()
   }
   let cnt3 = 0
   while (recorder.isRecording && cnt3 < 11) {
-    await waitForSomeSeconds(5)
+    await waitForSomeSeconds(2)
   }
   // recorder.stop()
   console.log('FINAL STATUS ______________________________________________________')
