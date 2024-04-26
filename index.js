@@ -102,6 +102,7 @@ app.put('/start-recording/:fileName', async (req, res) => {
       await waitForSomeSeconds(15)
       if (cnt >= 10) {
         console.log('!!!Eroare la /start-recording')
+        throw new Error('Eroare!!! la /start-recording')
       }
     }
     const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
