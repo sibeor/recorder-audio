@@ -1,4 +1,5 @@
 let fs = require('fs')
+const path = require('path')
 require('dotenv').config()
 let { WaveFile } = require('wavefile')
 let { PvRecorder } = require('@picovoice/pvrecorder-node')
@@ -16,6 +17,18 @@ app.get('/', (req, res) => {
   // res.send('Salut de pe serverul Express.js!')
   res.sendStatus(200)
 })
+function getCurrentDate(){
+  const currentDate = new Date();
+  
+  // Obține anul, luna și ziua din obiectul Date
+  const year = currentDate.getFullYear(); // Obține anul
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Obține luna (1-12) și adaugă zero în față dacă este necesar
+  const day = String(currentDate.getDate()).padStart(2, '0'); // Obține ziua (1-31) și adaugă zero în față dacă este necesar
+  
+  // Formatează data în formatul YYYY-MM-DD
+  const formattedDate = `${year}-${month}-${day}`;
+  return formattedDate
+}
 
 async function sendResultToServer (success, fileName) {
   try {
@@ -69,13 +82,14 @@ console.log(process?.env?.DEVICE_ID)
 let audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
 let frameLength = 512
 let recorder = new PvRecorder(frameLength, audioDeviceIndex)
+recorder.setDebugLogging(true)
 // console.log(`Using PvRecorder version: ${recorder.version}`)
 
 let isInterrupted = false
 app.put('/start-recording/:fileName', async (req, res) => {
   console.log('start-recording')
-  console.log('recorder.isRecording' + recorder.isRecording)
-  console.log('isRecording' + isRecording)
+  console.log('recorder.isRecording:' + recorder.isRecording)
+  console.log('isRecording:' + isRecording)
   try {
     fileName = req.params.fileName
     if (!fileName) {
@@ -87,22 +101,23 @@ app.put('/start-recording/:fileName', async (req, res) => {
       cnt++
       await waitForSomeSeconds(15)
       if (cnt >= 10) {
-        console.log('Eroare la /start-recording')
-        resetToDefaultValues()
+        console.log('!!!Eroare la /start-recording')
       }
     }
-    outputWavPath = 'recorders/' + fileName + '.wav'
+    const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
+    fs.mkdirSync(folderPath, { recursive: true });
+    outputWavPath = 'recorders/' + getCurrentDate() +'/' + fileName + '.wav'
     console.log('recorder.isRecording === FALSE')
     console.log(recorder.isRecording)
-    console.log(outputWavPath)
     outputPaths.push(outputWavPath)
+    console.log(outputPaths)
     
     recorder.start()
     isRecording = true
-    console.log(`Using device: ${recorder.getSelectedDevice()}`)
   } catch (e) {
     // recorder.stop()
-    // recorder.release()
+    recorder.release()
+    resetToDefaultValues()
     // res.send('Eroare la Începerea înregistrării...')
     console.log(e)
     console.log('Eroare la Începerea înregistrării.')
@@ -155,7 +170,8 @@ app.put('/stop-recording', async (req, res) => {
       await wav.fromScratch(1, recorder.sampleRate, '16', audioData)
       await waitForSomeSeconds(4)
       outputWavPath = outputPaths.shift()
-      console.log(outputWavPath)
+      console.log('outputPaths: ')
+      console.log(outputPaths)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
       await sendResultToServer(true, outputWavPath)
     } else {
@@ -164,10 +180,10 @@ app.put('/stop-recording', async (req, res) => {
     }
   } catch (e) {
     // res.send('Eroare la Oprirea înregistrării...')
-    recorder.stop()
     console.log(e)
     let cnt2 = 0
     while (recorder.isRecording && cnt2 < 11) {
+        cnt2++
        await waitForSomeSeconds(2)
     }
     await sendResultToServer(false, outputWavPath)
@@ -177,6 +193,7 @@ app.put('/stop-recording', async (req, res) => {
   }
   let cnt3 = 0
   while (recorder.isRecording && cnt3 < 11) {
+    cnt3++
     await waitForSomeSeconds(2)
   }
   // recorder.stop()
