@@ -99,10 +99,11 @@ app.put('/start-recording/:fileName', async (req, res) => {
     let cnt = 0
     while ((recorder.isRecording || isRecording) && cnt < 11) {
       cnt++
-      await waitForSomeSeconds(15)
+      await waitForSomeSeconds(12)
       if (cnt >= 10) {
         console.log('!!!Eroare la /start-recording')
-        throw new Error('Eroare!!! la /start-recording')
+        recorder.release()
+        resetToDefaultValues()
       }
     }
     const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
