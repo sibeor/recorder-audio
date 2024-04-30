@@ -100,6 +100,7 @@ app.put('/start-recording/:fileName', async (req, res) => {
     while ((recorder.isRecording || isRecording) && cnt < 11) {
       cnt++
       await waitForSomeSeconds(12)
+      await recorder.stop()
       if (cnt >= 10) {
         console.log('!!!Eroare la /start-recording')
         recorder.release()
@@ -172,7 +173,7 @@ app.put('/stop-recording', async (req, res) => {
       await wav.fromScratch(1, recorder.sampleRate, '16', audioData)
       await waitForSomeSeconds(4)
       outputWavPath = outputPaths.shift()
-      console.log('outputPaths: ')
+      console.log('outputPaths EMPTY: ')
       console.log(outputPaths)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
       await sendResultToServer(true, outputWavPath)
