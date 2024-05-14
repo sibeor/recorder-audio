@@ -18,6 +18,7 @@ else
     cd /c
     git clone https://github.com/sibeor/recorder-audio.git
     cd "$APP_FOLDER" || exit
+    git config --global --add save.directory C:/recorder-audio
     cp .env.example .env
     npm install
     pm2 start index.js --instances 1
