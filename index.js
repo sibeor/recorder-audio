@@ -102,7 +102,7 @@ app.put('/start-recording/:fileName', async (req, res) => {
     let cnt = 0
     while ((recorder.isRecording || isRecording) && cnt < 11) {
       cnt++
-      await waitForSomeSeconds(12)
+      await waitForSomeSeconds(6)
       await recorder.stop()
       if (cnt >= 10) {
         console.log('!!!Eroare la /start-recording')
