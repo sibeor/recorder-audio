@@ -9,13 +9,22 @@ if [ ! -d "$PM2_FOLDER" ]; then
     cd "$PM2_FOLDER" || exit
     npm i pm2
     echo "Instalarea s-a finalizat."
+else
+        # Verificăm dacă folderul este gol
+    if [ -z "$(ls -A "$PM2_FOLDER")" ]; then
+        echo "Folderul $PM2_FOLDER este gol. Îl ștergem acum..."
+        rmdir "$PM2_FOLDER"
+        echo "Folderul a fost șters."
+    else
+        echo "Folderul $PM2_FOLDER nu este gol."
+    fi
 fi
 
 if [ -d "$APP_FOLDER" ]; then
     cd "$APP_FOLDER" || exit
     git pull
 else
-    cd /c
+    cd /c || exit
     git clone https://github.com/sibeor/recorder-audio.git
     cd "$APP_FOLDER" || exit
     git config --global --add save.directory C:/recorder-audio
