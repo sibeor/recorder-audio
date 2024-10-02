@@ -103,12 +103,22 @@ app.put('/start-recording/:fileName', async (req, res) => {
     }
     let cnt = 0
     while ((recorder.isRecording || isRecording) && cnt < 11) {
+      // if (cnt === 0) {
+      //
+      //   await waitForSomeSeconds(1)
+      // }
+      console.log('CICLU>recorder.isRecording')
+      console.log(recorder.isRecording)
+      console.log('CICLU>isRecording')
+      console.log(isRecording)
+      // isInterrupted = true
       cnt++
       await waitForSomeSeconds(5)
       if (cnt >= 10) {
         isInterrupted = true
-        await recorder.stop()
+        await waitForSomeSeconds(2)
         console.log('!!!Eroare la /start-recording')
+        recorder.stop()
         // recorder.release()
         resetToDefaultValues()
       }
@@ -121,12 +131,12 @@ app.put('/start-recording/:fileName', async (req, res) => {
      outputPaths.push(outputWavPath)
     // console.log(outputPaths)
     
-    console.log('recorder.isRecording--1-->')
-    console.log(recorder.isRecording)
-    if (recorder.isRecording) {
-      await recorder.stop()
-        // resetToDefaultValues()
-    }
+    // console.log('recorder.isRecording--1-->')
+    // console.log(recorder.isRecording)
+    // if (recorder.isRecording) {
+    //   await recorder.stop()
+    //     // resetToDefaultValues()
+    // }
     console.log('recorder.isRecording--2-->')
     console.log(recorder.isRecording)
     await recorder.start()
@@ -168,8 +178,8 @@ function waitForSomeSeconds (seconds = 1) {
 
 async function waitForSaveCompletion () {
   let iter = 0
-  // FIXME: Dev/prod change to 10/100
-  while (isSaving && iter < 10) {
+  // FIXME: Dev/prod change to 10/200
+  while (isSaving && iter < 200) {
     iter++
     console.log('Waiting...')
     await new Promise(resolve => setTimeout(resolve, 1000))
@@ -180,7 +190,6 @@ app.put('/stop-recording', async (req, res) => {
   console.log('stop-recording')
   isSaving = true
   res.sendStatus(200)
-  isInterrupted = true
   
   // async function wait3sec () {
   //   console.log("Așteaptă 3 secunde...");
@@ -188,6 +197,7 @@ app.put('/stop-recording', async (req, res) => {
   // }
   
   try {
+    isInterrupted = true
     await waitForSomeSeconds(1)
     await recorder.stop()
     outputWavPath = outputPaths.shift()
@@ -219,7 +229,7 @@ app.put('/stop-recording', async (req, res) => {
     await sendResultToServer(false, outputWavPath)
     isRecording = false
     isInterrupted = true
-    recorder.stop()
+    recorder.release()
     resetToDefaultValues()
   } finally {
     isSaving = false
