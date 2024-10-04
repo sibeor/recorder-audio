@@ -20,10 +20,12 @@ app.get('/', (req, res) => {
 function getCurrentDate(){
   const currentDate = new Date();
   
+  // Obține anul, luna și ziua din obiectul Date
   const year = currentDate.getFullYear(); // Obține anul
-  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-  const day = String(currentDate.getDate()).padStart(2, '0');
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Obține luna (1-12) și adaugă zero în față dacă este necesar
+  const day = String(currentDate.getDate()).padStart(2, '0'); // Obține ziua (1-31) și adaugă zero în față dacă este necesar
   
+  // Formatează data în formatul YYYY-MM-DD
   const formattedDate = `${year}-${month}-${day}`;
   return formattedDate
 }
@@ -47,7 +49,7 @@ async function sendResultToServer (success, fileName) {
 }
 
 function resetToDefaultValues () {
-  // outputWavPath = ''
+  outputWavPath = ''
   // let fileName = ''
   if (!wav) {
     wav = new WaveFile()
@@ -66,7 +68,6 @@ function resetToDefaultValues () {
   // recorder = new PvRecorder(frameLength, audioDeviceIndex)
   isInterrupted = false
   isRecording = false
-  // isSaving = false
 }
 
 let devices = PvRecorder.getAvailableDevices()
@@ -85,13 +86,12 @@ let audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
 let frameLength = 512
 let recorder = new PvRecorder(frameLength, audioDeviceIndex)
 recorder.setDebugLogging(true)
+// console.log(`Using PvRecorder version: ${recorder.version}`)
 
 let isInterrupted = false
 let isSaving = false
-app.set('env', 'development')
 app.put('/start-recording/:fileName', async (req, res) => {
-  console.log('------------------------------------------------------------ start-recording ------------------------------------------------------------')
-  console.log(getTimeString())
+  console.log('start-recording')
   console.log('recorder.isRecording0000:' + recorder.isRecording)
   console.log('isRecording:' + isRecording)
   try {
@@ -102,15 +102,14 @@ app.put('/start-recording/:fileName', async (req, res) => {
       return
     }
     let cnt = 0
-    while ((recorder.isRecording || isRecording) && cnt < 6) {
+    while ((recorder.isRecording || isRecording) && cnt < 11) {
       cnt++
       await waitForSomeSeconds(5)
-      if (cnt >= 5) {
+      if (cnt >= 10) {
         isInterrupted = true
-        await waitForSomeSeconds(1)
-        recorder.stop()
-        await waitForSomeSeconds(2)
+        await recorder.stop()
         console.log('!!!Eroare la /start-recording')
+        // recorder.release()
         resetToDefaultValues()
       }
     }
@@ -122,15 +121,23 @@ app.put('/start-recording/:fileName', async (req, res) => {
      outputPaths.push(outputWavPath)
     // console.log(outputPaths)
     
+    console.log('recorder.isRecording--1-->')
+    console.log(recorder.isRecording)
+    if (recorder.isRecording) {
+      await recorder.stop()
+        // resetToDefaultValues()
+    }
     console.log('recorder.isRecording--2-->')
     console.log(recorder.isRecording)
     await recorder.start()
     isRecording = true
   } catch (e) {
+    // recorder.stop()
+    
     isInterrupted = true
-    await waitForSomeSeconds(1)
-    recorder.stop()
+    recorder.release()
     resetToDefaultValues()
+    // res.send('Eroare la Începerea înregistrării...')
     console.log(e)
     console.log('Eroare la Începerea înregistrării.')
   }
@@ -144,6 +151,7 @@ async function readBuffer () {
     let frame = await recorder.read()
     if (fileName) {
       frames.push(frame)
+      // console.log(recorder.isRecording)
     }
   }
 }
@@ -160,31 +168,29 @@ function waitForSomeSeconds (seconds = 1) {
 
 async function waitForSaveCompletion () {
   let iter = 0
-  // FIXME: Dev/prod change to 10/200
-  while (isSaving && iter < 200) {
+  // FIXME: Dev/prod change to 10/100
+  while (isSaving && iter < 10) {
     iter++
     console.log('Waiting...')
     await new Promise(resolve => setTimeout(resolve, 1000))
   }
 }
-function getTimeString(){
-  const now = new Date();
-  return `<<${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()} ${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}>>`
-}
 
 app.put('/stop-recording', async (req, res) => {
-  console.log('------------------------------------------------------------ stop-recording ------------------------------------------------------------')
+  console.log('stop-recording')
   isSaving = true
   res.sendStatus(200)
+  isInterrupted = true
+  
+  // async function wait3sec () {
+  //   console.log("Așteaptă 3 secunde...");
+  //   await new Promise(resolve => setTimeout(resolve, 3000));
+  // }
   
   try {
-    isInterrupted = true
     await waitForSomeSeconds(1)
-    recorder.stop()
+    //await recorder.stop()
     outputWavPath = outputPaths.shift()
-    console.log(getTimeString())
-    console.log('outputWavPath : ' + outputWavPath)
-    console.log('fileName : ' + fileName)
     if (fileName && !!outputWavPath) {
       let audioData = new Int16Array(recorder.frameLength * frames.length)
       for (let i = 0; i < frames.length; i++) {
@@ -212,10 +218,11 @@ app.put('/stop-recording', async (req, res) => {
     }
     await sendResultToServer(false, outputWavPath)
     isRecording = false
-    await recorder.release()
+    isInterrupted = true
+    recorder.release()
     resetToDefaultValues()
   } finally {
-    // isSaving = false
+    isSaving = false
   }
   let cnt3 = 0
   while (recorder.isRecording && cnt3 < 11) {
@@ -227,8 +234,6 @@ app.put('/stop-recording', async (req, res) => {
   console.log('IS_RECORDING?')
   console.log(recorder.isRecording)
   // recorder.release()
-  
-  isSaving = false
   resetToDefaultValues()
   
   // res.send('Oprirea înregistrării...')
