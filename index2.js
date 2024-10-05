@@ -47,13 +47,8 @@ async function sendResultToServer (success, fileName) {
 }
 
 function resetToDefaultValues () {
-  // outputWavPath = ''
-  // let fileName = ''
-  if (!wav) {
-    wav = new WaveFile()
-  }
+  outputWavPath = ''
   frames = []
-  outputPaths = []
   audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
   frameLength = 512
   if (!recorder) {
@@ -96,11 +91,6 @@ app.put('/start-recording/:fileName', async (req, res) => {
   console.log('isRecording:' + isRecording)
   try {
     await waitForSaveCompletion()
-    fileName = req.params.fileName
-    if (!fileName) {
-      res.sendStatus(404)
-      return
-    }
     let cnt = 0
     while ((recorder.isRecording || isRecording) && cnt < 6) {
       cnt++
@@ -115,6 +105,12 @@ app.put('/start-recording/:fileName', async (req, res) => {
       }
     }
     const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
+    fileName = req.params.fileName
+    if (!fileName) {
+      res.sendStatus(404)
+      return
+    }
+    outputPaths = []
     fs.mkdirSync(folderPath, { recursive: true });
     outputWavPath = 'recorders/' + getCurrentDate() +'/' + fileName + '.wav'
     // console.log('recorder.isRecording === FALSE')
@@ -124,7 +120,9 @@ app.put('/start-recording/:fileName', async (req, res) => {
     
     console.log('recorder.isRecording--2-->')
     console.log(recorder.isRecording)
+    await waitForSomeSeconds(2)
     await recorder.start()
+    await waitForSomeSeconds(1)
     isRecording = true
   } catch (e) {
     isInterrupted = true
@@ -174,6 +172,7 @@ function getTimeString(){
 
 app.put('/stop-recording', async (req, res) => {
   console.log('------------------------------------------------------------ stop-recording ------------------------------------------------------------')
+  console.log(getTimeString())
   isSaving = true
   res.sendStatus(200)
   
@@ -197,6 +196,7 @@ app.put('/stop-recording', async (req, res) => {
       console.log('outputPaths EMPTY: ')
       console.log(outputPaths)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
+      await waitForSomeSeconds(2)
       await sendResultToServer(true, outputWavPath)
     } else {
       await sendResultToServer(false, outputWavPath)
@@ -204,6 +204,7 @@ app.put('/stop-recording', async (req, res) => {
     }
   } catch (e) {
     // res.send('Eroare la Oprirea înregistrării...')
+    console.log(getTimeString())
     console.log(e)
     let cnt2 = 0
     while (recorder.isRecording && cnt2 < 11) {
@@ -212,7 +213,7 @@ app.put('/stop-recording', async (req, res) => {
     }
     await sendResultToServer(false, outputWavPath)
     isRecording = false
-    await recorder.release()
+    recorder.release()
     resetToDefaultValues()
   } finally {
     // isSaving = false
