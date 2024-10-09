@@ -1,5 +1,6 @@
 let fs = require('fs')
 const path = require('path')
+const { exec } = require('child_process');
 require('dotenv').config()
 let { WaveFile } = require('wavefile')
 let { PvRecorder } = require('@picovoice/pvrecorder-node')
@@ -17,15 +18,25 @@ app.get('/', (req, res) => {
   // res.send('Salut de pe serverul Express.js!')
   res.sendStatus(200)
 })
+function resurrectPM2() {
+    exec('pm2 resurrect', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Eroare la rularea comenzii: ${error}`);
+            return;
+        }
+        console.log(`Rezultatul comenzii: ${stdout}`);
+        if (stderr) {
+            console.error(`Erori: ${stderr}`);
+        }
+    });
+}
 function getCurrentDate(){
   const currentDate = new Date();
   
-  // Obține anul, luna și ziua din obiectul Date
   const year = currentDate.getFullYear(); // Obține anul
-  const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Obține luna (1-12) și adaugă zero în față dacă este necesar
-  const day = String(currentDate.getDate()).padStart(2, '0'); // Obține ziua (1-31) și adaugă zero în față dacă este necesar
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const day = String(currentDate.getDate()).padStart(2, '0');
   
-  // Formatează data în formatul YYYY-MM-DD
   const formattedDate = `${year}-${month}-${day}`;
   return formattedDate
 }
@@ -50,12 +61,7 @@ async function sendResultToServer (success, fileName) {
 
 function resetToDefaultValues () {
   outputWavPath = ''
-  let fileName = ''
-  if (!wav) {
-    wav = new WaveFile()
-  }
   frames = []
-  outputPaths = []
   audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
   frameLength = 512
   if (!recorder) {
@@ -68,6 +74,7 @@ function resetToDefaultValues () {
   // recorder = new PvRecorder(frameLength, audioDeviceIndex)
   isInterrupted = false
   isRecording = false
+  // isSaving = false
 }
 
 let devices = PvRecorder.getAvailableDevices()
@@ -86,47 +93,59 @@ let audioDeviceIndex = parseInt(process?.env?.DEVICE_ID) || 0
 let frameLength = 512
 let recorder = new PvRecorder(frameLength, audioDeviceIndex)
 recorder.setDebugLogging(true)
-// console.log(`Using PvRecorder version: ${recorder.version}`)
 
 let isInterrupted = false
+let isSaving = false
+app.set('env', 'development')
 app.put('/start-recording/:fileName', async (req, res) => {
-  console.log('start-recording')
-  console.log('recorder.isRecording:' + recorder.isRecording)
+  console.log('------------------------------------------------------------ start-recording ------------------------------------------------------------')
+  console.log(getTimeString())
+  console.log('recorder.isRecording0000:' + recorder.isRecording)
   console.log('isRecording:' + isRecording)
   try {
+    await waitForSaveCompletion()
+    let cnt = 0
+    while ((recorder.isRecording || isRecording) && cnt < 6) {
+      cnt++
+      await waitForSomeSeconds(5)
+      if (cnt >= 5) {
+        isInterrupted = true
+        await waitForSomeSeconds(1)
+        recorder.stop()
+        await waitForSomeSeconds(2)
+        console.log('!!!Eroare la /start-recording')
+        resetToDefaultValues()
+      }
+    }
+    const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
     fileName = req.params.fileName
     if (!fileName) {
       res.sendStatus(404)
       return
     }
-    let cnt = 0
-    while ((recorder.isRecording || isRecording) && cnt < 11) {
-      cnt++
-      await waitForSomeSeconds(6)
-      await recorder.stop()
-      if (cnt >= 10) {
-        console.log('!!!Eroare la /start-recording')
-        recorder.release()
-        resetToDefaultValues()
-      }
-    }
-    const folderPath = path.join(__dirname, 'recorders/' +  getCurrentDate());
+    outputPaths = []
     fs.mkdirSync(folderPath, { recursive: true });
     outputWavPath = 'recorders/' + getCurrentDate() +'/' + fileName + '.wav'
-    console.log('recorder.isRecording === FALSE')
-    console.log(recorder.isRecording)
-    outputPaths.push(outputWavPath)
-    console.log(outputPaths)
+    // console.log('recorder.isRecording === FALSE')
+    // console.log(recorder.isRecording)
+     outputPaths.push(outputWavPath)
+    // console.log(outputPaths)
     
-    recorder.start()
+    console.log('recorder.isRecording--2-->')
+    console.log(recorder.isRecording)
+    await waitForSomeSeconds(2)
+    await recorder.start()
+    await waitForSomeSeconds(1)
     isRecording = true
   } catch (e) {
-    // recorder.stop()
-    recorder.release()
+    isInterrupted = true
+    await waitForSomeSeconds(1)
+    recorder.stop()
     resetToDefaultValues()
-    // res.send('Eroare la Începerea înregistrării...')
     console.log(e)
     console.log('Eroare la Începerea înregistrării.')
+    console.log('************* resurrectPM2 *************')
+    resurrectPM2()
   }
   // res.send('Începerea înregistrării...')
   res.sendStatus(200)
@@ -134,12 +153,10 @@ app.put('/start-recording/:fileName', async (req, res) => {
 })
 
 async function readBuffer () {
-  let cnt = 0
   while (!isInterrupted) {
     let frame = await recorder.read()
     if (fileName) {
       frames.push(frame)
-      // console.log(recorder.isRecording)
     }
   }
 }
@@ -154,20 +171,37 @@ function waitForSomeSeconds (seconds = 1) {
   })
 }
 
+async function waitForSaveCompletion () {
+  let iter = 0
+  // FIXME: Dev/prod change to 10/200
+  while (isSaving && iter < 200) {
+    iter++
+    console.log('Waiting...')
+    await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+}
+function getTimeString(){
+  const now = new Date();
+  return `<<${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()} ${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}>>`
+}
+
 app.put('/stop-recording', async (req, res) => {
-  console.log('stop-recording')
+  console.log('------------------------------------------------------------ stop-recording ------------------------------------------------------------')
+  console.log(getTimeString())
+  isSaving = true
+  // FIXME: For PROD delete next line
+  // await waitForSomeSeconds(10)
   res.sendStatus(200)
-  isInterrupted = true
-  
-  // async function wait3sec () {
-  //   console.log("Așteaptă 3 secunde...");
-  //   await new Promise(resolve => setTimeout(resolve, 3000));
-  // }
   
   try {
+    isInterrupted = true
     await waitForSomeSeconds(1)
-    await recorder.stop()
-    if (fileName) {
+    recorder.stop()
+    outputWavPath = outputPaths.shift()
+    console.log(getTimeString())
+    console.log('outputWavPath : ' + outputWavPath)
+    console.log('fileName : ' + fileName)
+    if (fileName && !!outputWavPath) {
       let audioData = new Int16Array(recorder.frameLength * frames.length)
       for (let i = 0; i < frames.length; i++) {
         audioData.set(frames[i], i * recorder.frameLength)
@@ -175,10 +209,11 @@ app.put('/stop-recording', async (req, res) => {
       
       await wav.fromScratch(1, recorder.sampleRate, '16', audioData)
       await waitForSomeSeconds(4)
-      outputWavPath = outputPaths.shift()
+     
       console.log('outputPaths EMPTY: ')
       console.log(outputPaths)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
+      await waitForSomeSeconds(2)
       await sendResultToServer(true, outputWavPath)
     } else {
       await sendResultToServer(false, outputWavPath)
@@ -186,6 +221,7 @@ app.put('/stop-recording', async (req, res) => {
     }
   } catch (e) {
     // res.send('Eroare la Oprirea înregistrării...')
+    console.log(getTimeString())
     console.log(e)
     let cnt2 = 0
     while (recorder.isRecording && cnt2 < 11) {
@@ -196,17 +232,21 @@ app.put('/stop-recording', async (req, res) => {
     isRecording = false
     recorder.release()
     resetToDefaultValues()
+  } finally {
+    isSaving = false
   }
   let cnt3 = 0
   while (recorder.isRecording && cnt3 < 11) {
     cnt3++
-    await waitForSomeSeconds(2)
+    // await waitForSomeSeconds(2)
   }
   // recorder.stop()
   console.log('FINAL STATUS ______________________________________________________')
   console.log('IS_RECORDING?')
   console.log(recorder.isRecording)
   // recorder.release()
+  
+  isSaving = false
   resetToDefaultValues()
   
   // res.send('Oprirea înregistrării...')

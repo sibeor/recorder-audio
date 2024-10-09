@@ -1,5 +1,6 @@
 let fs = require('fs')
 const path = require('path')
+const { exec } = require('child_process');
 require('dotenv').config()
 let { WaveFile } = require('wavefile')
 let { PvRecorder } = require('@picovoice/pvrecorder-node')
@@ -17,6 +18,18 @@ app.get('/', (req, res) => {
   // res.send('Salut de pe serverul Express.js!')
   res.sendStatus(200)
 })
+function resurrectPM2() {
+    exec('pm2 resurrect', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Eroare la rularea comenzii: ${error}`);
+            return;
+        }
+        console.log(`Rezultatul comenzii: ${stdout}`);
+        if (stderr) {
+            console.error(`Erori: ${stderr}`);
+        }
+    });
+}
 function getCurrentDate(){
   const currentDate = new Date();
   
@@ -131,6 +144,8 @@ app.put('/start-recording/:fileName', async (req, res) => {
     resetToDefaultValues()
     console.log(e)
     console.log('Eroare la Începerea înregistrării.')
+    console.log('************* resurrectPM2 *************')
+    resurrectPM2()
   }
   // res.send('Începerea înregistrării...')
   res.sendStatus(200)
@@ -174,6 +189,8 @@ app.put('/stop-recording', async (req, res) => {
   console.log('------------------------------------------------------------ stop-recording ------------------------------------------------------------')
   console.log(getTimeString())
   isSaving = true
+  // FIXME: For PROD delete next line
+  // await waitForSomeSeconds(10)
   res.sendStatus(200)
   
   try {
@@ -216,12 +233,12 @@ app.put('/stop-recording', async (req, res) => {
     recorder.release()
     resetToDefaultValues()
   } finally {
-    // isSaving = false
+    isSaving = false
   }
   let cnt3 = 0
   while (recorder.isRecording && cnt3 < 11) {
     cnt3++
-    await waitForSomeSeconds(2)
+    // await waitForSomeSeconds(2)
   }
   // recorder.stop()
   console.log('FINAL STATUS ______________________________________________________')
