@@ -41,9 +41,10 @@ function getCurrentDate(){
   return formattedDate
 }
 
-async function sendResultToServer (success, fileName) {
+async function sendResultToServer (success, fileName, fileSizeInBytes = 0) {
   try {
-    const data = { success: success, fileName: fileName } // Poți modifica acest obiect pentru a transmite orice altă informație
+    
+    const data = { success: success, fileName: fileName, fileSize: fileSizeInBytes } // Poți modifica acest obiect pentru a transmite orice altă informație
     
     const crmBaseUrl = process?.env?.CRM_BASE_URL
     const crmUrl = crmBaseUrl + '/server/api/v3/qms/record_audio/status'
@@ -213,8 +214,16 @@ app.put('/stop-recording', async (req, res) => {
       console.log('outputPaths EMPTY: ')
       console.log(outputPaths)
       fs.writeFileSync(outputWavPath, wav.toBuffer())
+      let fileSizeInBytes
+      try {
+        const fileStats = fs.statSync(outputWavPath)
+        fileSizeInBytes = fileStats?.size
+      } catch (e) {
+        fileSizeInBytes = -1
+      }
+      console.log(fileSizeInBytes)
       await waitForSomeSeconds(2)
-      await sendResultToServer(true, outputWavPath)
+      await sendResultToServer(true, outputWavPath, fileSizeInBytes)
     } else {
       await sendResultToServer(false, outputWavPath)
       console.log('OCUPAT')
