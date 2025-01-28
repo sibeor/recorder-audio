@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
   res.sendStatus(200)
 })
 function resurrectPM2() {
-    exec('pm2 resurrect', (error, stdout, stderr) => {
+    exec('pm2 restart all', (error, stdout, stderr) => {
         if (error) {
             console.error(`Eroare la rularea comenzii: ${error}`);
             return;
@@ -221,9 +221,14 @@ app.put('/stop-recording', async (req, res) => {
       } catch (e) {
         fileSizeInBytes = -1
       }
+      fileSizeInBytes = (fileSizeInBytes >= 1000) ? Math.round(fileSizeInBytes / 1000) * 1000 : fileSizeInBytes
       console.log(fileSizeInBytes)
       await waitForSomeSeconds(2)
       await sendResultToServer(true, outputWavPath, fileSizeInBytes)
+      const fileSizeOnError = 1000 // fileSizeOnError = 44
+      if (fileSizeInBytes <= fileSizeOnError) {
+        resurrectPM2()
+      }
     } else {
       await sendResultToServer(false, outputWavPath)
       console.log('OCUPAT')
