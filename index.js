@@ -19,16 +19,29 @@ app.get('/', (req, res) => {
   res.sendStatus(200)
 })
 function resurrectPM2() {
-    exec('pm2 restart all', (error, stdout, stderr) => {
+    exec('pm2 resurrect', (error, stdout, stderr) => {
         if (error) {
-            console.error(`Eroare la rularea comenzii: ${error}`);
+            console.error(`Eroare la rularea comenzii pm2 resurrect: ${error}`);
             return;
         }
-        console.log(`Rezultatul comenzii: ${stdout}`);
+        console.log(`Rezultatul comenzii pm2 resurrect: ${stdout}`);
         if (stderr) {
             console.error(`Erori: ${stderr}`);
         }
     });
+}
+async function restartPM2 () {
+  await waitForSomeSeconds(2)
+  exec('pm2 restart all', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Eroare la rularea comenzii pm2 restart all: ${error}`);
+      return;
+    }
+    console.log(`Rezultatul comenzii pm2 restart all: ${stdout}`);
+    if (stderr) {
+      console.error(`Erori: ${stderr}`);
+    }
+  });
 }
 function getCurrentDate(){
   const currentDate = new Date();
@@ -227,7 +240,8 @@ app.put('/stop-recording', async (req, res) => {
       await sendResultToServer(true, outputWavPath, fileSizeInBytes)
       const fileSizeOnError = 1000 // fileSizeOnError = 44
       if (fileSizeInBytes <= fileSizeOnError) {
-        resurrectPM2()
+        console.log('************* restartPM2 *************')
+        await restartPM2()
       }
     } else {
       await sendResultToServer(false, outputWavPath)
